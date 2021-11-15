@@ -1,0 +1,58 @@
+ html {
+  font-family: Arial;
+  padding: 1rem;
+}
+button {
+  padding: 4px;
+  margin: 0px 3px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  background: transparent;
+}
+button:active {
+  border-color: black;
+  color: black;
+}
+
+button:hover {
+  background: black;
+  color: white;
+}
+
+.green {
+  background: green;
+  color: white;
+}
+.data td {
+  border-right: 1px solid #ccc;
+  border-bottom: 1px solid #ccc !important;
+  padding: 5px;
+  font-family: monospace, "Courier new"
+
+}
+      
+body {
+  margin: auto;
+  width: 900px;
+}
+
+.tester {
+  background: #eee;
+  padding: 0 1rem 1rem 1rem;
+  border: 1px solid#ccc;
+}
+
+.glitch-remix {
+  position: absolute;
+  right: 1rem;
+}
+
+.help {
+  color: #88b;
+}
+
+table {
+  border-spacing: 10px;
+  border-collapse: separate;
+}
+

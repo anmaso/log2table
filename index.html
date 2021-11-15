@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <!--
+      This is the page head - it contains info the browser uses to display the page
+      You won't see what's in the head in the page
+      Scroll down to the body element for the page content
+    -->
+
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="https://glitch.com/favicon.ico" />
+    
+    <!-- 
+      This is an HTML comment
+      You can write text in a comment and the content won't be visible in the page
+    -->
+
+    <title>log2table</title>
+
+    <!-- Import the webpage's javascript file -->
+    <script src="/script.js" defer></script>
+    <script src="/sampledata.js" defer></script>
+    <link rel="stylesheet" href="style.css">
+
+    <script src="https://unpkg.com/vue@next"></script>  
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.3.2/chart.min.js" integrity="sha512-VCHVc5miKoln972iJPvkQrUYYq7XpxXzvqNfiul1H4aZDwGBGC0lq373KNleaB2LpnC2a/iNfE5zoRYmB4TRDQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <style>
+     
+      
+    </style>
+  </head>
+  <body>
+    <span class="glitch-remix"></span>
+    <h1 class="title">Log2table</h1>
+    <div id="vue">
+        <button @click="toggleHelp">help</button>
+          <div v-if="showHelp">
+            
+          <p>
+          This app extracts data from a log to a tabular format.
+        </p>
+        <ul>
+          <li>
+            Start by defining the "start record match" and then for each record
+            you can define rules to extract data.
+          </li>
+          <li>
+            Rules are converted to regular expression
+            <pre>new RegExp(rule)</pre>
+          </li>
+          <li>
+            Lines will be consumed until next rule applies or all lines of a
+            record are consumed
+          </li>
+          <li>
+            Advance line to "false" to extract more than one value from the line
+            (rule does not consume the line)
+          </li>
+          <li>Mark as optional if the line can appear or not.</li>
+          <li>
+            Capture will be translated to:
+            <pre>new RegExp( "("+rule+")")</pre>
+            and first capture group is used for the table value
+          </li>
+          <li>You can save your rules with "rules to clipboard"</li>
+          <li>Load rules from text area with "Load text as rules"</li>
+        </ul>  
+        </div>
+      <button @click="sampledata">load sample data</button>
+      <button @click="loadRules">load text as rules</button>
+      <br /><br />
+      <textarea v-model="log" id="log" rows="20" cols="100"></textarea>
+      <div class="tester">
+        <h4>Test your regexp</h4>
+        <div>Sample: <input v-model="sample" size="40" /></div>
+        RegExp <input v-model="regexp" /> match: {{match}}
+      </div>
+      <br />
+      <p>Start record match: <input @keyup="calcRecords" v-model="startline" /> Records: {{records}}</p>
+
+      <p>Rules:</p>
+      <table>
+        <tr style="font-weight:bolder;font-size:.8rem">
+          <td>Column Name</td>
+          <td witdh="100px">Advance<br/> line</td>
+          <td witdh="100px">Optional</td>
+          <td>Match</td>
+          <td>Capture</td>
+          <td></td>
+        </tr>
+
+        <tr v-for="(rule,idx) in rules">
+          <td><input v-model="rule.name" /></td>
+          <td><input type="checkbox" v-model="rule.advance" /></td>
+          <td><input type="checkbox" v-model="rule.optional" /></td>
+          <td><input v-model="rule.match" /></td>
+          <td><input v-model="rule.capture" /></td>
+          <td><button @click="upRule(rule, idx)">^</button></td>
+          <td><button @click="copyRule(rule, idx)">+</button></td>
+          <td><button @click="removeRule(rule)">-</button></td>
+        </tr>
+      </table>
+
+      <button @click="addRule()">add rule</button>
+      <button @click="clipboard()">rules to clipboard</button>
+      <button @click="clear()">clear all</button>
+      
+      <button @click="go" class="green">go</button>
+      <br /><br />
+
+      <table class="data">
+        
+      
+      <tr v-for="d in tableData" :key="d" v-html="d"></tr>
+      </table>
+      <button @click="copyTable()">copy table to clipboard</button>
+      <button @click="createGraph">graph</button><br/>
+      <input type="checkbox" v-model="firstColumn" />first <span v-if="dataColumn">row</span><span v-else>column</span> is label<br/>
+      <input type="checkbox" v-model="dataColumn" />data is in columns<br/>
+    </div>
+    <!-- The footer holds our remix button — you can use it for structure or cut it out ✂ -->
+    <br /><br /><br />
+  
+    <div style="height:300px" id="chart">
+       
+    </div>
+
+  </body>
+  <script>
+    
+    const copyToClipboard = str => {
+        const el = document.createElement('textarea');
+        el.value = str;
+        el.setAttribute('readonly', '');
+        el.style.position = 'absolute';
+        el.style.left = '-9999px';
+        document.body.appendChild(el);
+        el.select();
+        document.execCommand('copy');
+        document.body.removeChild(el);
+      };
+    
+    function transpose(a) {
+      return Object.keys(a[0]).map(function(c) {
+          return a.map(function(r) { return r[c]; });
+      });
+    }
+    
+    const Counter = {
+      setup() {
+        const sample = Vue.ref("");
+        const log = Vue.ref("");
+        const startline = Vue.ref("");
+        const regexp = Vue.ref("");
+        const match = Vue.computed(() => {
+          try {
+            return sample.value.match(new RegExp(regexp.value));
+          } catch (e) {
+            return e;
+          }
+          return "hola";
+        });
+        const rules = Vue.ref([]);
+        const firstColumn = Vue.ref(true);
+        const dataColumn = Vue.ref(false);
+        const showHelp = Vue.ref(false);
+        const toggleHelp = ()=> showHelp.value=!showHelp.value;
+        
+        const records = Vue.ref(0);
+
+
+        const calcRecords = ()=>{
+          try{
+            records.value=log.value.split(new RegExp(startline.value)).length
+          }catch(e){
+            records.value=0;
+          }
+          
+        }
+
+
+        const newRule = () => ({
+          name: "",
+          advance: true,
+          match: "",
+          capture: "",
+          optional: false
+        });
+        //rules.value.push(newRule())
+        rules.value.push(newRule());
+
+        const addRule = () => rules.value.push(newRule());
+        const copyRule = (rule, idx)=> rules.value.splice(idx+1, 0, {...rule})
+        const upRule = (rule, idx)=> idx>0 && ([rules.value[idx-1], rules.value[idx]] = [rules.value[idx], rules.value[idx-1]])
+        const removeRule = ob => {
+          console.log(ob);
+          return (rules.value = rules.value.filter(o => o != ob));
+        };
+
+        const clipboard = ()=> copyToClipboard( JSON.stringify(rules.value, null, 2))
+        const tableData = Vue.ref([]);
+        
+        const loadRules = ()=> rules.value=JSON.parse(log.value)
+
+        const arr = (n)=>{
+          const r=[];
+          for(var i=0;i<n;i++){
+            r.push(i+1);
+          }
+          return r;
+        }
+        
+        
+        let tableValue = "";
+        
+     
+        
+       
+        
+   
+        const go = () => {
+          tableValue = "";
+        
+          const data = getData(rules.value, log.value, startline.value);
+
+          tableData.value = [
+            rules.value.reduce((acc, el) => acc + '<td>'+el.name + "</td>", "")
+          ];
+          tableValue = rules.value.reduce((acc, el) => acc + el.name+'\t' , "") + "\n";
+    
+          tableValue = data.reduce( (acc, linedata)=> tableValue += linedata.join("\t") + "\n", tableValue);
+          
+          data.forEach( linedata=> tableData.value.push('<td>'+linedata.join("</td><td>")+'</td>'));
+         
+          console.log("td", tableData.value)
+
+          console.log("records", records.length);
+        };
+
+        const copyTable = () => copyToClipboard(tableValue)
+        
+        const sampledata = () => {
+          log.value = window.SAMPLE.textarea;
+          sample.value = window.SAMPLE.sample;
+          regexp.value = window.SAMPLE.regexp;
+          rules.value = window.SAMPLE.rules;
+          startline.value = window.SAMPLE.startline;
+        };
+        const clear = () => {
+          regexp.value = "";
+          sample.value = "";
+          rules.value = [];
+          log.value = "";
+          startline.value = "";
+        };
+        
+        const createGraph = ()=>{
+          const getRandomColor = ()=> '#'+Math.floor(Math.random()*16777215).toString(16);
+          const labels = rules.value.reduce((acc, el) => acc.concat(el.name) , []) ;
+          
+          var chart = document.getElementById('chart');
+          chart.innerHTML='';
+          var canvas = document.createElement('canvas')
+          chart.appendChild(canvas)
+          //var ctx = document.getElementById('myChart').getContext('2d');
+          
+          ctx=canvas.getContext('2d')
+          const datasets = (dataColumn.value? transpose(data).filter((r,idx)=>idx>0):data).map((d,idx)=>{
+            const dcopy = [...d]
+            const label = dataColumn.value? 
+                  rules.value[firstColumn.value?idx:idx+1].name
+                  :
+                  firstColumn.value? dcopy.shift() : "row-"+(idx+1);
+            return {data:dcopy.map(parseFloat), borderColor:getRandomColor(), label}
+            
+          })
+          console.log(datasets)
+    
+          var myChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+              labels: dataColumn.value? arr(data.length):arr(data[0].length-(firstColumn.value?1:0)),
+              datasets  
+            },
+             options: {
+                    maintainAspectRatio: false,
+                }
+            
+              
+          })
+          
+        };
+
+        return {
+          go,
+          rules,
+          loadRules,
+          addRule,
+          copyRule,
+          removeRule,
+          upRule,
+          clipboard,
+          tableData,
+          copyTable,
+          sample,
+          regexp,
+          match,
+          sampledata,
+          log,
+          clear,
+          startline,
+          createGraph,
+          firstColumn,
+          dataColumn,
+          
+          showHelp,
+          toggleHelp,
+          
+          records,
+          calcRecords
+          
+          
+        };
+      }
+    };
+    Vue.createApp(Counter).mount("#vue");
+    
+  
+  </script>
+      <script src="https://remix.glitch.me/remix.min.js"></script>
+</html>
