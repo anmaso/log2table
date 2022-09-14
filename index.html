@@ -264,7 +264,7 @@
           var canvas = document.createElement('canvas')
           chart.appendChild(canvas)
           //var ctx = document.getElementById('myChart').getContext('2d');
-          
+          const data = getData(rules.value, log.value, startline.value);
           ctx=canvas.getContext('2d')
           const datasets = (dataColumn.value? transpose(data).filter((r,idx)=>idx>0):data).map((d,idx)=>{
             const dcopy = [...d]
